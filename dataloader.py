@@ -9,9 +9,8 @@ from torch.utils.data import DataLoader, Dataset
 """
 [input]
 - input_ids (tokenized data)
-- token_type_ids (0 for context, 1 for question)
 - attention_mask_ids (1 for sentence, 0 for padded parts)
-- format --> [CLS] + [context] + [SEP] + [question] + [SEP] + [PAD]
+- format --> [CLS] + [context] + [SEP]*2 + [question] + [SEP] + [PAD]
 
 * when context is larger than max_len --> cut to chunk 
 * label_start and label_end will be [CLS] if does not exist
@@ -48,7 +47,6 @@ class QA_dataset(Dataset):
         data = self.text_processing(data_dict, args, tokenizer)
         self.tokenizer = tokenizer
         self.input = data['input_ids']
-        self.token_type = data['token_type_ids'] 
         self.attn_mask = data['attn_mask_ids'] 
         self.label_start = data['label_start'] 
         self.label_end = data['label_end']
@@ -58,19 +56,17 @@ class QA_dataset(Dataset):
     
     def __getitem__(self, idx):
         x = self.input[idx]
-        y = self.token_type[idx]
         z = self.attn_mask[idx] 
         label_s = self.label_start[idx].view(-1)
         label_e = self.label_end[idx].view(-1)
         #return x, y, z, label_s, label_e
-        return {'input_ids': x, 'attention_mask': z, 'token_type': y, 'label_s': label_s, 'label_e': label_e}
+        return {'input_ids': x, 'attention_mask': z, 'label_s': label_s, 'label_e': label_e}
 
 
     #### remove torch_type_ids -> add decoder_input_ids, decoder_attention_mask
 
     def text_processing(self, data, args, tokenizer):
         input_ids = []
-        token_input_ids = []
         attn_mask_ids = []
         label_start = [] # char start idx in context 
         label_end = []   # char end idx in context
@@ -101,8 +97,8 @@ class QA_dataset(Dataset):
                 print(f"q: {q}") 
                 print(f"a: {a}") 
             """
-
-            spair_len = max_len - 3 - len(q) # length left for context 
+            spair_len = max_len - 4 - len(q) # length left for context 
+            assert (spair_len > 0)
 
             chunk = []
             if (len(c) <= spair_len):
@@ -112,7 +108,7 @@ class QA_dataset(Dataset):
             else:
                 # need to divide context into chunk
                 iter_num = len(c)//spair_len + 1 if len(c)%spair_len != 0 else len(c)//spair_len
-                for i in iter_num:
+                for i in range(iter_num):
                     chunk.append(c[i*spair_len:(i+1)*spair_len])
 
             stack_idx = 0
@@ -120,9 +116,9 @@ class QA_dataset(Dataset):
                 # end = start = 0 if not exist in _chunk
                 # take care with the fact that idx starts from 0
               
-                _chunk_len = len(_chunk) + len(q) + 3 
-                _input_ids = [tokenizer.cls_token_id] + _chunk + [tokenizer.sep_token_id] + q + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (max_len-_chunk_len)  
-                _token_input_ids = [0]*(len(_chunk)+2) + [1]*(max_len-(len(_chunk)+2))  
+                _chunk_len = len(_chunk) + len(q) + 4 
+                _input_ids = [tokenizer.cls_token_id] + q + [tokenizer.sep_token_id]*2 + _chunk + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (max_len-_chunk_len)  
+                assert(len(_input_ids) <= max_len)
                 _attn_mask_ids = [1]*_chunk_len + [0]*(max_len-_chunk_len)
 
                 _start_idx = start_idx - stack_idx      # idx in current chunk
@@ -159,14 +155,14 @@ class QA_dataset(Dataset):
                 stack_idx += len(_chunk)
                 
                 input_ids.append(torch.tensor(_input_ids, dtype=torch.long) )
-                token_input_ids.append(torch.tensor(_token_input_ids, dtype=torch.long))
                 attn_mask_ids.append(torch.tensor(_attn_mask_ids, dtype=torch.long))
+                assert (_label_start >= 0 and _label_end >= 0 and _label_end <= len(_chunk)-1)
                 label_start.append(torch.tensor(_label_start, dtype=torch.long))
                 label_end.append(torch.tensor(_label_end, dtype=torch.long))
 
-        assert(len(input_ids) == len(token_input_ids) == len(attn_mask_ids) == len(label_start) == len(label_end))
+        assert(len(input_ids) == len(attn_mask_ids) == len(label_start) == len(label_end))
 
-        return {'input_ids': input_ids, 'token_type_ids': token_input_ids, 'attn_mask_ids': attn_mask_ids, 'label_start': label_start, 'label_end': label_end}    
+        return {'input_ids': input_ids, 'attn_mask_ids': attn_mask_ids, 'label_start': label_start, 'label_end': label_end}    
 
     def add_end_idx(self, answers, contexts):
         for answer, context in zip(answers, contexts):
@@ -183,6 +179,7 @@ class QA_dataset(Dataset):
             elif context[start_idx-2:end_idx-2] == gold_text:
                 answer['answer_start'] = start_idx-2
                 answer['answer_end'] = end_idx-2 
+        assert (answer['answer_start'] < len(contexts) and answer['answer_end'] < len(contexts))
         return
 
     def read_squad(self, path):
@@ -205,5 +202,7 @@ class QA_dataset(Dataset):
 
         self.add_end_idx(answers, contexts)
 
+        assert (len(contexts)==len(questions)==len(answers))
+        print(f"# of contexts: {len(contexts)}")
         return {'context': contexts, 'question': questions, 'answer': answers}
         

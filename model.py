@@ -39,15 +39,20 @@ class Base(pl.LightningModule):
 class KoBART_QA(Base):
     def __init__(self, hparams, **kwargs):
         super().__init__(hparams, **kwargs)
-        self.model = BartForQuestionAnswering.from_pretrained("hyunwoongko/kobart")
-        self.model.train()
+        if not self.hparams.infer_one:
+            self.model = BartForQuestionAnswering.from_pretrained("hyunwoongko/kobart")
+            print("### In train mode")
+            self.model.train()
+        else:
+            print(f"### In eval mode! Loading from.. {self.hparams.checkpoint_path}")
+            #self.model = BartForQuestionAnswering.from_pretrained(self.hparams.checkpoint_path)
+            self.model = BartForQuestionAnswering.from_pretrained("./kobart_qa-model_chp/epoch_min.ckpt")
 
     def forward(self, inputs):
         return self.model(input_ids=inputs['input_ids'],
                             attention_mask=inputs['attention_mask'],
-                            token_type_ids=inputs['token_type'],
-                            start_position=inputs['label_s'],
-                            end_position=inputs['label_e'],
+                            start_positions=inputs['label_s'],
+                            end_positions=inputs['label_e'],
                             return_dict=True)
     
     def training_step(self, batch, batch_idx):
@@ -70,11 +75,20 @@ class KoBART_QA(Base):
     def infer_one(self, tokenizer, context, question):
         c = tokenizer.encode(context, add_special_tokens=False)
         q = tokenizer.encode(question, add_special_tokens=False)
-        input_ids = [tokenizer.cls_token] + c + [tokenizer.sep_token_id] + q + [tokenizer.sep_token_id]
-        res_ids = self.model(torch.tensor([input_ids]), 
-                    max_length=self.hparams.max_len, 
-                    num_beams=5,
-                    eos_token_id=tokenizer.sep_token_id,
-                    bad_token_id=[[tokenizer.unk_token_id]])
-        a = self.tokenizer.batch_decode(res_ids.tolist())[0]
-        return a.replace(tokenizer.cls_token, '').replace(tokenizer.sep_token, '')
+        max_len = self.hparams.max_len
+        total_len = len(q)+len(c)+4
+        input_ids = torch.tensor([[tokenizer.cls_token_id] + q + [tokenizer.sep_token_id]*2 + c + [tokenizer.sep_token_id]])
+        attention_mask = torch.tensor([[1]*total_len])
+        output = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        start_pt = torch.argmax(output.start_logits)
+        end_pt = torch.argmax(output.end_logits)
+        input_ids = input_ids[0].tolist()
+        if (start_pt > end_pt):
+            ans = input_ids[end_pt:start_pt+1]
+        else:
+            ans = input_ids[start_pt:end_pt+1]
+        ret = ""
+        for elem in ans:
+            ret += tokenizer.convert_ids_to_tokens(elem)    
+        print(ret.replace("▁", " "))
+        return
