@@ -6,16 +6,6 @@ import pytorch_lightning as pl
 from pathlib import Path
 from torch.utils.data import DataLoader, Dataset 
 
-"""
-[input]
-- input_ids (tokenized data)
-- attention_mask_ids (1 for sentence, 0 for padded parts)
-- format --> [CLS] + [context] + [SEP]*2 + [question] + [SEP] + [PAD]
-
-* when context is larger than max_len --> cut to chunk 
-* label_start and label_end will be [CLS] if does not exist
-"""
-
 class QADataModule(pl.LightningDataModule):
     def __init__(self, args, tokenizer):
         super().__init__()
@@ -61,9 +51,6 @@ class QA_dataset(Dataset):
         label_e = self.label_end[idx].view(-1)
         #return x, y, z, label_s, label_e
         return {'input_ids': x, 'attention_mask': z, 'label_s': label_s, 'label_e': label_e}
-
-
-    #### remove torch_type_ids -> add decoder_input_ids, decoder_attention_mask
 
     def text_processing(self, data, args, tokenizer):
         input_ids = []
@@ -114,10 +101,9 @@ class QA_dataset(Dataset):
             stack_idx = 0
             for i, _chunk in enumerate(chunk):
                 # end = start = 0 if not exist in _chunk
-                # take care with the fact that idx starts from 0
               
                 _chunk_len = len(_chunk) + len(q) + 4 
-                _input_ids = [tokenizer.cls_token_id] + q + [tokenizer.sep_token_id]*2 + _chunk + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (max_len-_chunk_len)  
+                _input_ids = [tokenizer.cls_token_id] + _chunk + [tokenizer.sep_token_id]*2 + q + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (max_len-_chunk_len)  
                 assert(len(_input_ids) <= max_len)
                 _attn_mask_ids = [1]*_chunk_len + [0]*(max_len-_chunk_len)
 
@@ -157,6 +143,7 @@ class QA_dataset(Dataset):
                 input_ids.append(torch.tensor(_input_ids, dtype=torch.long) )
                 attn_mask_ids.append(torch.tensor(_attn_mask_ids, dtype=torch.long))
                 assert (_label_start >= 0 and _label_end >= 0 and _label_end <= len(_chunk)-1)
+                # +1 for cls token in placement 0
                 label_start.append(torch.tensor(_label_start, dtype=torch.long))
                 label_end.append(torch.tensor(_label_end, dtype=torch.long))
 

@@ -13,16 +13,6 @@ from transformers import BartForQuestionAnswering, PreTrainedTokenizerFast
 from dataloader import QADataModule
 from model import KoBART_QA
 
-SPECIAL_TOKENS = {
-    "additional_special_tokens": ["<dense-vectors>", "<tokens>", "<verb>", "<ARG0>", "<ARG1>", "<global-dense-vectors>"],
-    "pad_token": "<pad>",
-    "bos_token": "<bos>", 
-    "eos_token": "<eos>", 
-    "cls_token": "<cls>",
-    "sep_token": "<sep>",
-    "unk_token": "<unk>",
-}
-
 parser = argparse.ArgumentParser(description="KoBART KoSQuAD")
 
 parser.add_argument("--max_len", type=int, default=384) #384
@@ -48,24 +38,14 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 tokenizer = PreTrainedTokenizerFast.from_pretrained("hyunwoongko/kobart", cls_token="<s>", sep_token="</s>")
-print(f"cls id: {tokenizer.cls_token_id}")
-print(f"sep id: {tokenizer.sep_token_id}")
 
 # output keys of model -> start_logits, end_logits, past_key_values, encoder_last_hidden_state
 
-"""
+print(f"args: {args}")
 if args.infer_one:
-    f = open(args.hparams)
-    hparams = yaml.load(f)
-    hparams['checkpoint_path'] = args.checkpoint_path
-    hparams['infer_one'] = args.infer_one
-    print(f"hparams: {hparams}")
-    model = KoBART_QA(hparams)
+    model = KoBART_QA(args)
 else:
     model = KoBART_QA(args)
-"""
-print(f"args: {args}")
-model = KoBART_QA(args)
 
 if args.infer_one:
     model.model.eval()

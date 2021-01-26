@@ -45,8 +45,7 @@ class KoBART_QA(Base):
             self.model.train()
         else:
             print(f"### In eval mode! Loading from.. {self.hparams.checkpoint_path}")
-            #self.model = BartForQuestionAnswering.from_pretrained(self.hparams.checkpoint_path)
-            self.model = BartForQuestionAnswering.from_pretrained("./kobart_qa-model_chp/epoch_min.ckpt")
+            self.model = BartForQuestionAnswering.from_pretrained(self.hparams.checkpoint_path)
 
     def forward(self, inputs):
         return self.model(input_ids=inputs['input_ids'],
@@ -79,16 +78,22 @@ class KoBART_QA(Base):
         total_len = len(q)+len(c)+4
         input_ids = torch.tensor([[tokenizer.cls_token_id] + q + [tokenizer.sep_token_id]*2 + c + [tokenizer.sep_token_id]])
         attention_mask = torch.tensor([[1]*total_len])
+        print("input_ids: ",input_ids)
         output = self.model(input_ids=input_ids, attention_mask=attention_mask)
+        assert (input_ids.shape == output.start_logits.shape == output.end_logits.shape)
         start_pt = torch.argmax(output.start_logits)
         end_pt = torch.argmax(output.end_logits)
         input_ids = input_ids[0].tolist()
+        print(f"start_pt: {start_pt}, end_pt: {end_pt}")
         if (start_pt > end_pt):
-            ans = input_ids[end_pt:start_pt+1]
+            print("Error. Start point is larger than end point")
         else:
-            ans = input_ids[start_pt:end_pt+1]
-        ret = ""
-        for elem in ans:
-            ret += tokenizer.convert_ids_to_tokens(elem)    
-        print(ret.replace("▁", " "))
+            if (start_pt==0 and end_pt==0):
+                print("No answer!!")
+            else:
+                ans = context[start_pt:end_pt]
+                ret = ""
+                for elem in ans:
+                    ret += elem    
+                print(ret.replace("▁", " "))
         return
