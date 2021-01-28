@@ -7,6 +7,7 @@ from pathlib import Path
 from torch.utils.data import DataLoader, Dataset 
 
 debug = False
+k_space = "▁", 
 
 class QADataModule(pl.LightningDataModule):
     def __init__(self, args, tokenizer):
@@ -87,9 +88,17 @@ class QA_dataset(Dataset):
             if answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)-1]):
                 start_token = len(prev_ids)-1 
             # case 2 - when they are not connected 
-            else:
+            elif answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)]):
                 start_token = len(prev_ids)
-                assert answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)]), answer_text
+            elif answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)+1]):
+                start_token = len(prev_ids)+1
+            else:
+                print(f"context: {context}")
+                print(tokenizer.convert_ids_to_tokens(context_ids))
+                print(f"answer_text: {answer_text}")
+                print(f"len(prev_ids): {len(prev_ids)}")
+                print(f"context_ids[len(prev_ids)]: {context_ids[len(prev_ids)]}")
+                assert (False)
 
             # starting from the start_token, go through context_ids till all the answers are out
             possible_ans = ""
