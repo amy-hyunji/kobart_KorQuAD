@@ -40,12 +40,13 @@ class KoBART_QA(Base):
     def __init__(self, hparams, **kwargs):
         super().__init__(hparams, **kwargs)
         if not self.hparams.infer_one:
-            self.model = BartForQuestionAnswering.from_pretrained("hyunwoongko/kobart")
             print("### In train mode")
+            self.model = BartForQuestionAnswering.from_pretrained("hyunwoongko/kobart")
             self.model.train()
         else:
             print(f"### In eval mode! Loading from.. {self.hparams.checkpoint_path}")
             self.model = BartForQuestionAnswering.from_pretrained(self.hparams.checkpoint_path)
+            self.model.eval()
 
     def forward(self, inputs):
         return self.model(input_ids=inputs['input_ids'],
@@ -75,25 +76,41 @@ class KoBART_QA(Base):
         c = tokenizer.encode(context, add_special_tokens=False)
         q = tokenizer.encode(question, add_special_tokens=False)
         max_len = self.hparams.max_len
-        total_len = len(q)+len(c)+4
-        input_ids = torch.tensor([[tokenizer.cls_token_id] + q + [tokenizer.sep_token_id]*2 + c + [tokenizer.sep_token_id]])
-        attention_mask = torch.tensor([[1]*total_len])
-        print("input_ids: ",input_ids)
-        output = self.model(input_ids=input_ids, attention_mask=attention_mask)
-        assert (input_ids.shape == output.start_logits.shape == output.end_logits.shape)
-        start_pt = torch.argmax(output.start_logits)
-        end_pt = torch.argmax(output.end_logits)
-        input_ids = input_ids[0].tolist()
-        print(f"start_pt: {start_pt}, end_pt: {end_pt}")
-        if (start_pt > end_pt):
-            print("Error. Start point is larger than end point")
+        
+        spair_len = max_len-4-len(q)
+        assert (spair_len > 0)
+
+        chunk = []
+        if (len(c) <= spair_len):
+            # no problem. just make the format
+            print(f"Done fitting into one chunk!")
+            chunk.append(c)
         else:
-            if (start_pt==0 and end_pt==0):
-                print("No answer!!")
+            # need to divide context into chunk
+            print(f"Dividing! Cannot fit into one chunk!")
+            iter_num = len(c)//spair_len + 1 if len(c)%spair_len != 0 else len(c)//spair_len
+            for i in range(iter_num):
+                chunk.append(c[i*spair_len:(i+1)*spair_len])
+
+        ret = ""
+        for i, _chunk in enumerate(chunk):
+            total_len = 4 + len(_chunk) + len(q)
+            input_ids = torch.tensor([[tokenizer.cls_token_id] + _chunk + [tokenizer.sep_token_id]*2 + q + [tokenizer.sep_token_id] + [tokenizer.pad_token_id]*(max_len-total_len)])
+            attention_mask = torch.tensor([[1]*total_len + [0]*(max_len-total_len)])
+            output = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            assert (input_ids.shape == output.start_logits.shape == output.end_logits.shape)
+            start_pt = torch.argmax(output.start_logits)
+            end_pt = torch.argmax(output.end_logits)
+            input_ids = input_ids[0].tolist()
+            if (start_pt >= end_pt):
+                if (start_pt==0 and end_pt==0):
+                    print("No answer!!")
+                else:
+                    print("Error. End point should be larger than start point")
             else:
-                ans = context[start_pt:end_pt]
-                ret = ""
+                ans = _chunk[start_pt+1:end_pt+1]
+                print(tokenizer.convert_ids_to_tokens(ans))
                 for elem in ans:
-                    ret += elem    
-                print(ret.replace("▁", " "))
+                    ret += tokenizer.convert_ids_to_tokens(elem)    
+        print("#### final answer: ",ret.replace("▁", " "))
         return

@@ -21,7 +21,7 @@ parser.add_argument("--train_path", type=str, default="./data/KorQuAD_v1.0_train
 parser.add_argument("--test_path", type=str, default="./data/KorQuAD_v1.0_dev.json")
 parser.add_argument("--checkpoint_path", type=str, default="./output/last_ckpt.ckpt")
 parser.add_argument("--hparams", type=str, default=None)
-parser.add_argument("--batch_size", type=int, default=32) #32
+parser.add_argument("--batch_size", type=int, default=8) #32
 parser.add_argument("--num_workers", type=int, default=3)
 parser.add_argument("--infer_one", action='store_true')
 parser.add_argument("--default_root_dir", type=str, default="./")
@@ -29,7 +29,7 @@ parser.add_argument("--lr", type=float, default=5e-5)
 parser.add_argument("--warmup_ratio", type=float, default=0.1)
 parser.add_argument("--gpus", type=int, default=1)
 parser.add_argument("--num_nodes", type=int, default=1)
-parser.add_argument("--accumulate_grad_batches", type=int, default=1)
+parser.add_argument("--accumulate_grad_batches", type=int, default=4)
 
 args = parser.parse_args()
 logging.info(args)
@@ -39,13 +39,8 @@ logger.setLevel(logging.INFO)
 
 tokenizer = PreTrainedTokenizerFast.from_pretrained("hyunwoongko/kobart", cls_token="<s>", sep_token="</s>")
 
-# output keys of model -> start_logits, end_logits, past_key_values, encoder_last_hidden_state
-
 print(f"args: {args}")
-if args.infer_one:
-    model = KoBART_QA(args)
-else:
-    model = KoBART_QA(args)
+model = KoBART_QA(args)
 
 if args.infer_one:
     model.model.eval()
