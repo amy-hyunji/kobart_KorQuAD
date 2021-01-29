@@ -93,6 +93,7 @@ class QA_dataset(Dataset):
             elif answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)+1]):
                 start_token = len(prev_ids)+1
             else:
+                print("ERROR!!!")
                 print(f"context: {context}")
                 print(tokenizer.convert_ids_to_tokens(context_ids))
                 print(f"answer_text: {answer_text}")
@@ -114,7 +115,6 @@ class QA_dataset(Dataset):
                 m+=1
                 #print(f"possible_ans: {possible_ans}")
                 end_token = start_token + m
-            #print("ANSWER: ", tokenizer.convert_ids_to_tokens(context_ids[start_token:end_token]))
             if error: continue 
             assert (answer_text in possible_ans)
 
@@ -153,15 +153,15 @@ class QA_dataset(Dataset):
                 
                 # already extracted answer from previous chunk
                 if (_start_idx < 0 and _end_idx <= 0):
-                    if debug: print("case 1")
+                    if debug: print("case 1: answers already from previous chunk")
                     _label_start = 0
                     _label_end = 0
            
                 # second chunk with partial answer
                 elif (_start_idx < 0 and _end_idx > 0):
-                    if debug: print("case 2")
                     _label_start = 1
                     _label_end = _end_idx + 1
+                    if debug: print(f"case 2: partial answer second chunk, ans: {tokenizer.convert_ids_to_tokens(_input_ids[_label_start:_label_end])}")
 
                 elif (_start_idx >= 0 and _end_idx < 0):
                     print("Shouldn't be here!\ncontext: {context}\nchunk: {_chunk}\nanswer: {answer}")
@@ -170,20 +170,20 @@ class QA_dataset(Dataset):
                 else:
                     # answer in later chunk 
                     if len(_chunk) <= _start_idx:
-                        if debug: print(f"case 3: len(_chunk): {len(_chunk)}, start_idx: {start_idx}")
+                        if debug: print(f"case 3: Answer in later chunk")
                         _label_start = 0
                         _label_end = 0
                     elif _start_idx < len(_chunk):
                         # first chunk with partial answer
                         if len(_chunk) <= _end_idx:
-                            if debug: print("case 4")
                             _label_start = _start_idx + 1
                             _label_end = len(_chunk) + 1
+                            if debug: print(f"case 4: partial answer first chunk, ans: {tokenizer.convert_ids_to_tokens(_input_ids[_label_start:_label_end])}")
                         # all in current chunk
                         else:
-                            if debug: print("case 5")
                             _label_start = _start_idx + 1
                             _label_end = _end_idx + 1
+                            if debug: print(f"case 5: all in here!, ans: {tokenizer.convert_ids_to_tokens(_input_ids[_label_start:_label_end])}")
                
                 if debug: print("answer!!: ",tokenizer.convert_ids_to_tokens(_chunk[_start_idx:_end_idx]))
                 stack_idx += len(_chunk)
@@ -194,14 +194,14 @@ class QA_dataset(Dataset):
                 # +1 for cls token in placement 0
                 label_start.append(torch.tensor(_label_start, dtype=torch.long))
                 label_end.append(torch.tensor(_label_end, dtype=torch.long))
-               
+       
                 """
-                if (i==0):
-                    print(f"context: {context}")
-                    print(f"question: {question}")
-                    print(f"_label_start: {_label_start}")
-                    print(f"_label_end: {_label_end}")
-                    print(f"answer: {answer}")
+                print(f"context: {context}")
+                print(f"question: {question}")
+                print(f"answer: {answer}")
+                print(f"chunk: {tokenizer.convert_ids_to_tokens(_chunk)}")
+                print(f"possible_answer: {tokenizer.convert_ids_to_tokens(_input_ids[_label_start:_label_end])}")
+                print(" ")
                 """
 
         assert(len(input_ids) == len(attn_mask_ids) == len(label_start) == len(label_end))

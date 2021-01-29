@@ -108,7 +108,7 @@ class KoBART_QA(Base):
                 else:
                     print("Error. End point should be larger than start point")
             else:
-                ans = _chunk[start_pt+1:end_pt+1]
+                ans = input_ids[start_pt:end_pt]
                 print(tokenizer.convert_ids_to_tokens(ans))
                 for elem in ans:
                     ret += tokenizer.convert_ids_to_tokens(elem)    
