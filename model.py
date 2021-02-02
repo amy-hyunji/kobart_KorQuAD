@@ -94,6 +94,7 @@ class KoBART_QA(Base):
 
         ret = ""
         for i, _chunk in enumerate(chunk):
+            print("chunk: ", tokenizer.convert_ids_to_tokens(_chunk))
             total_len = 4 + len(_chunk) + len(q)
             input_ids = torch.tensor([[tokenizer.cls_token_id] + _chunk + [tokenizer.sep_token_id]*2 + q + [tokenizer.sep_token_id] + [tokenizer.pad_token_id]*(max_len-total_len)])
             attention_mask = torch.tensor([[1]*total_len + [0]*(max_len-total_len)])

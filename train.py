@@ -17,8 +17,8 @@ parser = argparse.ArgumentParser(description="KoBART KoSQuAD")
 
 parser.add_argument("--max_len", type=int, default=384) #384
 parser.add_argument("--max_epochs", type=int, default=35)
-parser.add_argument("--train_path", type=str, default="./data/KorQuAD_v1.0_train.json")
-parser.add_argument("--test_path", type=str, default="./data/KorQuAD_v1.0_dev.json")
+parser.add_argument("--train_path", type=str, default="./data/train")
+parser.add_argument("--test_path", type=str, default="./data/test")
 parser.add_argument("--checkpoint_path", type=str, default="./output/last_ckpt.ckpt")
 parser.add_argument("--hparams", type=str, default=None)
 parser.add_argument("--batch_size", type=int, default=8) #32

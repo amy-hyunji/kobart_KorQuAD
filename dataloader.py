@@ -1,12 +1,14 @@
 import json
 import sys
+import os
 import torch
 import pytorch_lightning as pl
 
+from tqdm import tqdm
 from pathlib import Path
 from torch.utils.data import DataLoader, Dataset 
 
-debug = False
+debug = False 
 k_space = "▁", 
 
 class QADataModule(pl.LightningDataModule):
@@ -43,7 +45,7 @@ class QA_dataset(Dataset):
         self.attn_mask = data['attn_mask_ids'] 
         self.label_start = data['label_start'] 
         self.label_end = data['label_end']
-        print(f"state: {state}, # of dataset: {len(self.input)}")
+        print(f"***** state: {state}, # of dataset: {len(self.input)}")
         assert (len(self.input) == len(self.attn_mask) == len(self.label_start) == len(self.label_end))
 
     def __len__(self):
@@ -54,7 +56,6 @@ class QA_dataset(Dataset):
         z = self.attn_mask[idx] 
         label_s = self.label_start[idx].view(-1)
         label_e = self.label_end[idx].view(-1)
-        #return x, y, z, label_s, label_e
         return {'input_ids': x, 'attention_mask': z, 'label_s': label_s, 'label_e': label_e}
 
     def text_processing(self, data, args, tokenizer):
@@ -65,7 +66,7 @@ class QA_dataset(Dataset):
         max_len = args.max_len
         data_num = len(data['context'])
 
-        for idx in range(data_num):
+        for idx in tqdm(range(data_num)):
 
             context = data['context'][idx]
             question = data['question'][idx] 
@@ -74,15 +75,11 @@ class QA_dataset(Dataset):
             end_idx = answer['answer_end']     # end idx+1 of the char in context
             answer_text = answer['text']
 
-            #print(f"context: {context}")
-            #print(f"answer: {answer}")
-
             prev_sen = context[:start_idx]
             assert (answer_text == context[start_idx:end_idx])
 
             prev_ids = tokenizer.encode(prev_sen, add_special_tokens=False)
             context_ids = tokenizer.encode(context, add_special_tokens=False) 
-            #print(f"tokenized context: {tokenizer.convert_ids_to_tokens(context_ids)}") 
             # get start_token 
             # case 1 - when the first elem of answer text is connected to last elem of prev_ids
             if answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)-1]):
@@ -93,13 +90,16 @@ class QA_dataset(Dataset):
             elif answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)+1]):
                 start_token = len(prev_ids)+1
             else:
-                print("ERROR!!!")
+                print("ERROR!!! in finding start_token")
+                continue
+                """
                 print(f"context: {context}")
                 print(tokenizer.convert_ids_to_tokens(context_ids))
                 print(f"answer_text: {answer_text}")
                 print(f"len(prev_ids): {len(prev_ids)}")
                 print(f"context_ids[len(prev_ids)]: {context_ids[len(prev_ids)]}")
                 assert (False)
+                """
 
             # starting from the start_token, go through context_ids till all the answers are out
             possible_ans = ""
@@ -109,7 +109,7 @@ class QA_dataset(Dataset):
             while not answer_text in possible_ans:
                 if (start_token+m == len(context_ids)): 
                     error = True
-                    print(f"Error occured in context: {context}, answer: {answer}")
+                    #print(f"Error occured in context: {context}, answer: {answer}")
                     break
                 possible_ans += tokenizer.convert_ids_to_tokens(context_ids[start_token+m]).replace("▁", " ")
                 m+=1
@@ -143,8 +143,6 @@ class QA_dataset(Dataset):
               
                 _chunk_len = len(_chunk) + len(q) + 4
                 _input_ids = [tokenizer.cls_token_id] + _chunk + [tokenizer.sep_token_id]*2 + q + [tokenizer.sep_token_id] + [tokenizer.pad_token_id] * (max_len-_chunk_len)  
-                if (len(_input_ids) != max_len):
-                    print(f"len(_input_ids): {len(_input_ids)}\nmax_len: {max_len}\nchink_len: {_chunk_len}\nlen(_chunk): {len(_chunk)}\nspair_len: {spair_len}\nq_len: {len(q)}")
                 assert(len(_input_ids) == max_len)
                 _attn_mask_ids = [1]*_chunk_len + [0]*(max_len-_chunk_len)
 
@@ -157,10 +155,16 @@ class QA_dataset(Dataset):
                     _label_start = 0
                     _label_end = 0
            
-                # second chunk with partial answer
+                # second chunk with partial answer -> 
                 elif (_start_idx < 0 and _end_idx > 0):
-                    _label_start = 1
-                    _label_end = _end_idx + 1
+                    # answer ends in this chunk
+                    if _end_idx <= len(_chunk):
+                        _label_start = 1
+                        _label_end = _end_idx + 1
+                    # answer connected to next chunk
+                    else:
+                        _label_start = 1
+                        _label_end = len(_chunk) + 1
                     if debug: print(f"case 2: partial answer second chunk, ans: {tokenizer.convert_ids_to_tokens(_input_ids[_label_start:_label_end])}")
 
                 elif (_start_idx >= 0 and _end_idx < 0):
@@ -187,10 +191,13 @@ class QA_dataset(Dataset):
                
                 if debug: print("answer!!: ",tokenizer.convert_ids_to_tokens(_chunk[_start_idx:_end_idx]))
                 stack_idx += len(_chunk)
-                
+        
+            
+                ### append all elements
                 input_ids.append(torch.tensor(_input_ids, dtype=torch.long) )
                 attn_mask_ids.append(torch.tensor(_attn_mask_ids, dtype=torch.long))
-                assert (_label_start >= 0 and _label_end >= 0 and _label_end <= len(_chunk)+1)
+                assert (_label_start >= 0 and _label_end >= 0)
+                assert (_label_end <= len(_chunk)+1)
                 # +1 for cls token in placement 0
                 label_start.append(torch.tensor(_label_start, dtype=torch.long))
                 label_end.append(torch.tensor(_label_end, dtype=torch.long))
@@ -223,30 +230,60 @@ class QA_dataset(Dataset):
             elif context[start_idx-2:end_idx-2] == gold_text:
                 answer['answer_start'] = start_idx-2
                 answer['answer_end'] = end_idx-2 
-        assert (answer['answer_start'] < len(contexts) and answer['answer_end'] < len(contexts))
+            assert (answer['answer_start'] <= len(context))
+            assert (answer['answer_end'] <= len(context))
         return
 
     def read_squad(self, path):
-        with open(path, 'rb') as f:
-            squad_dict = json.load(f)
+        contexts1 = []
+        questions1 = []
+        answers1 = []
+        contexts2 = []
+        questions2 = []
+        answers2 = []
 
-        contexts = []
-        questions = []
-        answers = []
-        
-        for group in squad_dict['data']:
-            for passage in group['paragraphs']:
-                context = passage['context']
-                for qa in passage['qas']:
-                    question = qa['question']
-                    for answer in qa['answers']:
-                        contexts.append(context)
-                        questions.append(question)
-                        answers.append(answer)
+        file_list = os.listdir(path)
+        for _file in file_list:
+            print(f"Working on ... {_file}")
+            with open(os.path.join(path, _file), 'rb') as f:
+                try:
+                    squad_dict = json.load(f)
+                except:
+                    print(f"Error on file: {_file}")
+                    continue
 
-        self.add_end_idx(answers, contexts)
+            
+            
+            for group in squad_dict['data']:
+                # KorQuAD 1.0
+                if 'paragraphs' in group.keys():
+                    for passage in group['paragraphs']:
+                        context = passage['context']
+                        for qa in passage['qas']:
+                            question = qa['question']
+                            for answer in qa['answers']:
+                                contexts1.append(context)
+                                questions1.append(question)
+                                answers1.append(answer)
+                # KorQuAD 2.0
+                else:
+                    context = group['context']
+                    for qa in group['qas']:
+                        question = qa['question']
+                        answer = qa['answer']
 
-        assert (len(contexts)==len(questions)==len(answers))
-        print(f"# of contexts: {len(contexts)}")
-        return {'context': contexts, 'question': questions, 'answer': answers}
+                        contexts2.append(context)
+                        questions2.append(question)
+                        answers2.append(answer)
+        self.add_end_idx(answers1, contexts1)
+        self.add_end_idx(answers2, contexts2)
+        ver1_num = len(contexts1)
+        ver2_num = 90000-ver1_num
+        contexts2 = contexts2[:ver2_num]
+        questions2 = questions2[:ver2_num]
+        answers2 = answers2[:ver2_num]
+        assert (len(contexts1)==len(questions1)==len(answers1))
+        assert (len(contexts2)==len(questions2)==len(answers2))
+        print(f"# of total contexts: {len(contexts1)+len(contexts2)}") #60407 for ver1.0
+        return {'context': contexts1+contexts2, 'question': questions1+questions2, 'answer': answers1+answers2}
         
