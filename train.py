@@ -30,6 +30,7 @@ parser.add_argument("--warmup_ratio", type=float, default=0.1)
 parser.add_argument("--gpus", type=int, default=1)
 parser.add_argument("--num_nodes", type=int, default=1)
 parser.add_argument("--accumulate_grad_batches", type=int, default=4)
+parser.add_argument("--squad_ver", type=int, default=2)
 
 args = parser.parse_args()
 logging.info(args)
