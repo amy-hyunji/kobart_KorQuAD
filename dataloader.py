@@ -117,7 +117,7 @@ class QA_dataset2(Dataset):
         return len(self.data_list)
 
     def __getitem__(self, idx):
-        path, num = self.data_list[idx])
+        path, num = self.data_list[idx]
         if path != self.path:
             self.path = path
             self.df = pd.read_csv(path)
@@ -132,7 +132,7 @@ class QA_dataset2(Dataset):
         file_list = os.listdir(path)
         ret_list = []
         for _file in file_list:
-            num = int(path.split("/")[-1].split("_")[0])
+            num = int(_file.split("_")[0])
             for i in range(num):
                 ret_list.append([os.path.join(path, _file), i])
         return ret_list
