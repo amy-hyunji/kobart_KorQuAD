@@ -61,6 +61,6 @@ if __name__ == "__main__":
         # save tokenized result
         df = pd.DataFrame(data)
         num = len(data['input_ids'])
-        file_name = str(num) + "_" + _file
-        df.to_csv(os.path.join(args.save_path, file_name))
+        file_name = str(num) + "_" + _file.split(".json")[0]+".pkl"
+        df.to_pickle(os.path.join(args.save_path, file_name))
         print(f"Done Saving {os.path.join(args.save_path, file_name)}")

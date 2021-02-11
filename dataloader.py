@@ -69,9 +69,9 @@ class QA_dataset1(Dataset):
         return {'input_ids': x, 'attention_mask': z, 'label_s': label_s, 'label_e': label_e}
 
     def read_squad(self, path):
-        contexts1 = []
-        questions1 = []
-        answers1 = []
+        contexts = []
+        questions = []
+        answers = []
 
         file_list = os.listdir(path)
         for _file in file_list:
@@ -101,6 +101,7 @@ class QA_dataset1(Dataset):
 # for KorQuAD 2.0
 class QA_dataset2(Dataset):
     def __init__(self, args, state="train"):
+        print("### Working on KorQuAD 2.0")
         self.path = None
         self.df = None
         if state == "train":
@@ -120,11 +121,11 @@ class QA_dataset2(Dataset):
         path, num = self.data_list[idx]
         if path != self.path:
             self.path = path
-            self.df = pd.read_csv(path)
-        input_ids = self.df['input_ids'][num]
-        attn_mask_ids = self.df['attn_mask_ids'][num]
-        label_start = self.df['label_start'][num]
-        label_end = self.df['label_end'][num]
+            self.df = pd.read_pickle(path)
+        input_ids = list(self.df['input_ids'])[num]
+        attn_mask_ids = list(self.df['attn_mask_ids'])[num]
+        label_start = list(self.df['label_start'])[num]
+        label_end = list(self.df['label_end'])[num]
         return {'input_ids': input_ids, 'attention_mask': attn_mask_ids, 'label_s': label_start, 'label_e': label_end}
 
     def get_path_list(self, path):
