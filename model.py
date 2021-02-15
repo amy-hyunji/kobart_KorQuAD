@@ -41,14 +41,31 @@ class KoBART_QA(Base):
         super().__init__(hparams, **kwargs)
         if not self.hparams.infer_one:
             print("### In train mode")
-            self.model = BartForQuestionAnswering.from_pretrained("hyunwoongko/kobart")
+            if not self.hparams.checkpoint_path: 
+                self.model = BartForQuestionAnswering.from_pretrained("hyunwoongko/kobart")
+            else:
+                print(f"### Loading ckpt from.. {self.hparams.checkpoint_path}")
+                self.model = BartForQuestionAnswering.from_pretrained(self.hparams.checkpoint_path)
             self.model.train()
         else:
             print(f"### In eval mode! Loading from.. {self.hparams.checkpoint_path}")
             self.model = BartForQuestionAnswering.from_pretrained(self.hparams.checkpoint_path)
             self.model.eval()
+        
+        if torch.cuda.is_available():
+            print("*** Working in GPU")
+            self.gpu = True
+            self.model.cuda()
+        else:
+            print("*** Working in CPU")
+            self.gpu = False
 
     def forward(self, inputs):
+        if self.gpu:
+            inputs['input_ids'] = inputs['input_ids'].cuda()
+            inputs['attention_mask'] = inputs['attention_mask'].cuda()
+            inputs['label_s'] = inputs['label_s'].cuda()
+            inputs['label_e'] = inputs['label_e'].cuda()
         return self.model(input_ids=inputs['input_ids'],
                             attention_mask=inputs['attention_mask'],
                             start_positions=inputs['label_s'],
@@ -64,6 +81,7 @@ class KoBART_QA(Base):
     def validation_step(self, batch, batch_idx):
         outs = self(batch)
         loss = outs.loss
+        self.log('val_step_loss', loss, prog_bar=True)
         return loss
 
     def validation_epoch_end(self, outputs):

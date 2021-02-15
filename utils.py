@@ -30,6 +30,14 @@ def text_processing(data, args, tokenizer):
     label_end = []   # char end idx in context
     max_len = args.max_len
     data_num = len(data['context'])
+   
+    # contain context with no answer
+    n_input_ids = []
+    n_attn_mask_ids = []
+    n_label_start = [] 
+    n_label_end = []  
+
+    cleanse = args.cleanse
 
     for idx in tqdm(range(data_num)):
 
@@ -159,6 +167,14 @@ def text_processing(data, args, tokenizer):
 
 
             ### append all elements
+            if cleanse and (_label_start == _label_end == 0):
+                n_input_ids.append(torch.tensor(_input_ids, dtype=torch.long) )
+                n_attn_mask_ids.append(torch.tensor(_attn_mask_ids, dtype=torch.long))
+                assert (_label_start == 0 and _label_end == 0)
+                n_label_start.append(torch.tensor(_label_start, dtype=torch.long))
+                n_label_end.append(torch.tensor(_label_end, dtype=torch.long))
+                continue
+
             input_ids.append(torch.tensor(_input_ids, dtype=torch.long) )
             attn_mask_ids.append(torch.tensor(_attn_mask_ids, dtype=torch.long))
             assert (_label_start >= 0 and _label_end >= 0)
@@ -177,5 +193,15 @@ def text_processing(data, args, tokenizer):
             """
 
     assert(len(input_ids) == len(attn_mask_ids) == len(label_start) == len(label_end))
+    assert(len(n_input_ids) == len(n_attn_mask_ids) == len(n_label_start) == len(n_label_end))
+
+    # add save number of contexts to `input_ids` from `n_input_ids`
+    if cleanse:
+        _num = len(input_ids)
+        input_ids += n_input_ids[:_num]
+        attn_mask_ids += n_attn_mask_ids[:_num]
+        label_start += n_label_start[:_num]
+        label_end += n_label_end[:_num]
+        print(f"*** CLEANSE! # of context was {_num}.\n***Add empty context. Now {len(input_ids)}")
 
     return {'input_ids': input_ids, 'attn_mask_ids': attn_mask_ids, 'label_start': label_start, 'label_end': label_end} 

@@ -2,6 +2,7 @@ import json
 import sys
 import os
 import torch
+import pickle
 import pandas as pd
 import pytorch_lightning as pl
 
@@ -21,6 +22,10 @@ class QADataModule(pl.LightningDataModule):
         self.batch_size = args.batch_size
         self.max_len = args.max_len
     def setup(self, stage):
+        if self.args.shuffle: 
+            print("@@@@@ shuffling train dataset")
+        else:
+            print("@@@@@ NOT shuffling train dataset")
         if self.args.squad_ver == 1:
             self.qa_train = QA_dataset1(self.args, self.tokenizer, "train")
             self.qa_val = QA_dataset1(self.args, self.tokenizer, "test")
@@ -31,7 +36,7 @@ class QADataModule(pl.LightningDataModule):
             print(f"ERROR: inappropriate squad version - {self.args.squad_ver}")
             sys.exit(-1)
     def train_dataloader(self):
-        qa_train = DataLoader(self.qa_train, batch_size=self.batch_size, num_workers=self.args.num_workers, shuffle=True)
+        qa_train = DataLoader(self.qa_train, batch_size=self.batch_size, num_workers=self.args.num_workers, shuffle=self.args.shuffle)
         return qa_train
     def val_dataloader(self):
         qa_val = DataLoader(self.qa_val, batch_size=self.batch_size, num_workers=self.args.num_workers, shuffle=False)

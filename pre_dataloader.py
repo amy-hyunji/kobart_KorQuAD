@@ -43,9 +43,10 @@ def read_squad(_file):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="KoBART KorSquAD 2.0")
-    parser.add_argument("--data_path", type=str, default="./data/ver_2.0/dev")
-    parser.add_argument("--save_path", type=str, default="./data/cached_test")
-    parser.add_argument("--max_len", type=int, default=384)
+    parser.add_argument("--data_path", type=str, default="./data/ver_2.0/train")
+    parser.add_argument("--save_path", type=str, default="./data/cached_train_768")
+    parser.add_argument("--max_len", type=int, default=768)
+    parser.add_argument("--cleanse", action='store_true')
     args = parser.parse_args()
 
     tokenizer = PreTrainedTokenizerFast.from_pretrained("hyunwoongko/kobart", cls_token="<s>", sep_token="</s>")
@@ -53,7 +54,12 @@ if __name__ == "__main__":
         os.mkdir(args.save_path)
     
     file_list = os.listdir(args.data_path)
+    saved_list = os.listdir(args.save_path)
     for _file in file_list:
+        for s_file in saved_list:
+            if (_file.split(".json")[0] in s_file):
+                print(f"## {_file} already exists!! == {s_file}")
+                continue
         data_dict = read_squad(os.path.join(args.data_path, _file))
         if (data_dict is None): continue
         data = text_processing(data_dict, args, tokenizer)
