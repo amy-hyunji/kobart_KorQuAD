@@ -124,11 +124,11 @@ class KoBART_QA():
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max_len", type=int, default=384)
-    parser.add_argument("--input_path", type=str, default="./data/ver_1.0/test/KorQuAD_v1.0_dev.json")
-    parser.add_argument("--ckpt_path", type=str, default="./kobart_qa")
-    parser.add_argument("--output_file", type=str, default="predict.json")
-    parser.add_argument("--output_path", type=str, default="./data")
+    parser.add_argument("--max_len", type=int, default=384, help="max length of the context chunk")
+    parser.add_argument("--input_path", type=str, default="./data/ver_1.0/test/KorQuAD_v1.0_dev.json", help="path to input dataset")
+    parser.add_argument("--ckpt_path", type=str, default="./kobart_qa", help="path to binary file")
+    parser.add_argument("--output_file", type=str, default="predict.json", help="file name to save")
+    parser.add_argument("--output_path", type=str, default="./data", help="path to save")
     args = parser.parse_args()
 
     QA_class = KoBART_QA(args.ckpt_path, args.max_len)

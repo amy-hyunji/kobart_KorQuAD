@@ -15,24 +15,24 @@ from model import KoBART_QA
 
 parser = argparse.ArgumentParser(description="KoBART KoSQuAD")
 
-parser.add_argument("--max_len", type=int, default=384) #384
+parser.add_argument("--max_len", type=int, default=384, help="max length of the context chunk") 
 parser.add_argument("--max_epochs", type=int, default=35)
-parser.add_argument("--train_path", type=str, default="./data/train")
-parser.add_argument("--test_path", type=str, default="./data/test")
-parser.add_argument("--checkpoint_path", type=str, default="hyunwoongko/kobart")
+parser.add_argument("--train_path", type=str, default="./data/train", help="path to the folder containing train datasets")
+parser.add_argument("--test_path", type=str, default="./data/test", help="path to the folder containing test datasets")
+parser.add_argument("--checkpoint_path", type=str, default="hyunwoongko/kobart", help="ckpt path to load")
 parser.add_argument("--hparams", type=str, default=None)
-parser.add_argument("--batch_size", type=int, default=8) #32
+parser.add_argument("--batch_size", type=int, default=8) 
 parser.add_argument("--num_workers", type=int, default=3)
 parser.add_argument("--infer_one", action='store_true')
-parser.add_argument("--save_path", type=str, default="./")
+parser.add_argument("--save_path", type=str, default="./", help="path to save outputs")
 parser.add_argument("--lr", type=float, default=5e-5)
 parser.add_argument("--warmup_ratio", type=float, default=0.1)
 parser.add_argument("--gpus", type=int, default=1)
 parser.add_argument("--num_nodes", type=int, default=1)
 parser.add_argument("--accumulate_grad_batches", type=int, default=4)
-parser.add_argument("--squad_ver", type=int, default=2)
-parser.add_argument("--shuffle", action='store_true')
-parser.add_argument("--cleanse", action='store_true')
+parser.add_argument("--squad_ver", type=int, default=2, help="squad version 1.0 or 2.0")
+parser.add_argument("--shuffle", action='store_true', help="[squad v2.0] shuffle train dataset")
+parser.add_argument("--cleanse", action='store_true', help="[squad v2.0] equalize # of dataset for each label")
 
 args = parser.parse_args()
 logging.info(args)

@@ -1,4 +1,6 @@
 import torch
+import argparse
+
 from transformers import BartForQuestionAnswering, PreTrainedTokenizerFast 
 from konlpy.tag import Mecab
 
@@ -114,13 +116,20 @@ class KoBART_QA():
 
 
 if __name__ == "__main__":
-    QA_class = KoBART_QA()
-    batch = True 
     
-    if batch:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--max_len", type=int, default=384, help="max length of the context chunk")
+    parser.add_argument("--batch", action='store_true', help="operate in batch")
+    parser.add_argument("--batch_size", type=int, default=3)
+    parser.add_argument("--ckpt_path", type=str, default="./kobart_qa", help="path to binary file")
+    args = parser.parse_args()
+    
+    QA_class = KoBART_QA(args.ckpt_path, args.max_len)
+    
+    if args.batch:
         batch = []
         c = input('context> ').strip()
-        for i in range (3):
+        for i in range (args.batch_size):
             q = input('question> ').strip()
             batch.append([c, q])
         a_list = QA_class.batch_infer(batch)
