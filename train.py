@@ -63,7 +63,7 @@ else:
                                 verbose=True,
                                 save_last=True,
                                 mode="min",
-                                save_top_k=4,
+                                save_top_k=-1,
                                 prefix='kobart_qa')
     tb_logger = pl_loggers.TensorBoardLogger(os.path.join(args.save_path, 'tb_logs'))
     lr_logger = pl.callbacks.LearningRateMonitor()

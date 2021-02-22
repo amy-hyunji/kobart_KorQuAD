@@ -1,0 +1,1 @@
+CUDA_LAUNCH_BLOCKING=1 python train.py --squad_ver 1 --train_path ./data/ver_1.0/train --test_path ./data/ver_1.0/test --max_len 768 --batch_size 4 --save_path ./max_len_1024_ver_1.0_new_data --shuffle --accumulate_grad_batches 8 --lr 5e-6 

@@ -91,9 +91,11 @@ class KoBART_QA(Base):
         self.log('val_loss', torch.stack(losses).mean(), prog_bar=True)
 
     def infer_one(self, tokenizer, context, question):
+        
         c = tokenizer.encode(context, add_special_tokens=False)
         q = tokenizer.encode(question, add_special_tokens=False)
         max_len = self.hparams.max_len
+        print("### Max Length: {max_len}")
         
         spair_len = max_len-4-len(q)
         assert (spair_len > 0)

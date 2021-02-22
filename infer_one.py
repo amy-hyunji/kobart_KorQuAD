@@ -1,15 +1,16 @@
 import torch
 from transformers import BartForQuestionAnswering, PreTrainedTokenizerFast 
+from konlpy.tag import Mecab
 
 class KoBART_QA():
-    def __init__(self, ckpt_path="./kobart_qa", max_len=384):
-        print(torch.cuda.is_available())
-        self.model = BartForQuestionAnswering.from_pretrained(ckpt_path).cuda() 
+    def __init__(self, ckpt_path="./kobart_qa", max_len=1024):
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.model = BartForQuestionAnswering.from_pretrained(ckpt_path).to(self.device)
         self.tokenizer = PreTrainedTokenizerFast.from_pretrained("hyunwoongko/kobart", cls_token="<s>", sep_token="</s>")
         self.model.eval()
-        self.device = 'cuda'
         self.max_len = max_len
-    
+        self.mecab = Mecab()
+
     def get_chunk(self, context, question):
         c = self.tokenizer.encode(context, add_special_tokens=False)
         q = self.tokenizer.encode(question, add_special_tokens=False)
@@ -43,8 +44,8 @@ class KoBART_QA():
             input_ids = [self.tokenizer.cls_token_id] + _chunk + [self.tokenizer.sep_token_id]*2 + _q + [self.tokenizer.sep_token_id] + [self.tokenizer.pad_token_id]*(self.max_len-total_len)
             ret_dict['input_ids'].append(input_ids)
             ret_dict['attention_mask'].append(attention_mask)
-        ret_dict['input_ids'] = torch.tensor(ret_dict['input_ids']).cuda()
-        ret_dict['attention_mask'] = torch.tensor(ret_dict['attention_mask']).cuda()
+        ret_dict['input_ids'] = torch.tensor(ret_dict['input_ids']).to(self.device)
+        ret_dict['attention_mask'] = torch.tensor(ret_dict['attention_mask']).to(self.device)
         return ret_dict
 
     def batch_infer(self, batch):
@@ -77,6 +78,14 @@ class KoBART_QA():
                     for elem in tok_list:
                         ret += elem
             ret = ret.replace("▁", " ")
+            ret = ret.replace("<s>", "")
+            ret = ret.replace("</s>", "")
+            try:
+                elem_list = self.mecab.pos(ret)
+                if elem_list[-1][1] in ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JC', 'JX']:
+                    ret = ret.replace(elem_list[-1][0], '')
+            except:
+                print("Pass Pos TAG")
             ret_list.append(ret)
         return ret_list
 
@@ -94,8 +103,13 @@ class KoBART_QA():
                 ret_list = self.tokenizer.convert_ids_to_tokens(ans)
                 for elem in ret_list:
                     ret += elem
-
         ret = ret.replace("▁", " ")
+        try:
+            elem_list = self.mecab.pos(ret)
+            if elem_list[-1][1] in ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JC', 'JX']:
+                ret = ret.replace(elem_list[-1][0], '')
+        except:
+            print("Pass Pos TAG")
         return ret
 
 
@@ -110,17 +124,21 @@ if __name__ == "__main__":
             q = input('question> ').strip()
             batch.append([c, q])
         a_list = QA_class.batch_infer(batch)
-        for a in a_list: 
+        for i, a in enumerate(a_list): 
             if a is None:
-                print("No Answer!") 
+                print(f"[{i}]: No Answer!") 
             else:
-                print(f"Answer: {a}")
+                print(f"[{i}]: Answer {a}")
     else:
-        c = input('context> ').strip()
         while 1:
-            q = input('question> ').strip()
-            a = QA_class.infer(c, q)
-            if a is None:
-                print("No Answer!") 
-            else:
-                print(f"Answer: {a}")
+            c = input('context> ').strip()
+            if c == "exit": exit()
+            while 1:
+                q = input('question> ').strip()
+                if q == "exit":
+                    break
+                a = QA_class.infer(c, q)
+                if a is None:
+                    print("No Answer!") 
+                else:
+                    print(f"Answer: {a}")

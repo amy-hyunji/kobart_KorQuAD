@@ -1,5 +1,8 @@
 import torch
+import os
 import json
+import argparse
+
 from transformers import BartForQuestionAnswering, PreTrainedTokenizerFast 
 from konlpy.tag import Mecab
 
@@ -81,6 +84,7 @@ class KoBART_QA():
             ret = ret.replace("▁", " ")
             ret = ret.replace("<s>", "")
             ret = ret.replace("</s>", "")
+            
             try:
                 elem_list = self.mecab.pos(ret)
                 if elem_list[-1][1] in ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JC', 'JX']:
@@ -105,6 +109,9 @@ class KoBART_QA():
                 for elem in ret_list:
                     ret += elem
         ret = ret.replace("▁", " ")
+        ret = ret.replace("<s>", "")
+        ret = ret.replace("</s>", "")
+            
         try:
             elem_list = self.mecab.pos(ret)
             if elem_list[-1][1] in ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JC', 'JX']:
@@ -115,9 +122,17 @@ class KoBART_QA():
 
 
 if __name__ == "__main__":
-    QA_class = KoBART_QA()
-    dev_file = "./data/ver_1.0/test/KorQuAD_v1.0_dev.json"
-    f = open(dev_file, "r")
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--max_len", type=int, default=384)
+    parser.add_argument("--input_path", type=str, default="./data/ver_1.0/test/KorQuAD_v1.0_dev.json")
+    parser.add_argument("--ckpt_path", type=str, default="./kobart_qa")
+    parser.add_argument("--output_file", type=str, default="predict.json")
+    parser.add_argument("--output_path", type=str, default="./data")
+    args = parser.parse_args()
+
+    QA_class = KoBART_QA(args.ckpt_path, args.max_len)
+    f = open(args.input_path, "r")
     squad_dict = json.load(f)
 
     contexts = []
@@ -146,7 +161,7 @@ if __name__ == "__main__":
     for (_id, _answer) in zip(ids, a_list):
         ret[_id] = _answer
 
-    with open("./data/predict.json", "w") as json_file:
+    with open(os.path.join(args.output_path, args.output_file), "w") as json_file:
         json.dump(ret, json_file)
 
     print("Done!")
