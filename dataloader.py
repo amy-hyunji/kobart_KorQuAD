@@ -94,10 +94,19 @@ class QA_dataset1(Dataset):
                         context = passage['context']
                         for qa in passage['qas']:
                             question = qa['question']
-                            for answer in qa['answers']:
+                            # for no answer case
+                            if 'answers' not in qa.keys():
+                                answer = {'answer_start': 0, 'answer_end': 0, 'text': None}
                                 contexts.append(context)
                                 questions.append(question)
                                 answers.append(answer)
+                            else:
+                                for answer in qa['answers']:
+                                    if answer['text'][0] == ' ':
+                                        continue
+                                    contexts.append(context)
+                                    questions.append(question)
+                                    answers.append(answer)
         add_end_idx(answers, contexts)
         assert (len(contexts)==len(questions)==len(answers))
         print(f"# of total contexts: {len(contexts)}") #60407 for ver1.0

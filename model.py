@@ -90,6 +90,7 @@ class KoBART_QA(Base):
             losses.append(loss)
         self.log('val_loss', torch.stack(losses).mean(), prog_bar=True)
 
+    """
     def infer_one(self, tokenizer, context, question):
         
         c = tokenizer.encode(context, add_special_tokens=False)
@@ -135,3 +136,4 @@ class KoBART_QA(Base):
                     ret += tokenizer.convert_ids_to_tokens(elem)    
         print("#### final answer: ",ret.replace("▁", " "))
         return
+    """

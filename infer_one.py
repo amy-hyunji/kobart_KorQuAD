@@ -50,7 +50,7 @@ class KoBART_QA():
         ret_dict['attention_mask'] = torch.tensor(ret_dict['attention_mask']).to(self.device)
         return ret_dict
 
-    def batch_infer(self, batch):
+    def batch_infer(self, batch, skip_long):
         ret_list = []
         chunk = []
         question = []
@@ -69,7 +69,9 @@ class KoBART_QA():
         for num in chunk_num:
             # one answer for one question 
             ret = ""
+            t_list = []
             for _ in range(int(num)):
+                t_ret = ""
                 input_ids = list(data_dict['input_ids'][iter_num])
                 start_pt = list(start_pts)[iter_num]
                 end_pt = list(end_pts)[iter_num]
@@ -78,17 +80,27 @@ class KoBART_QA():
                     ans = input_ids[start_pt:end_pt]
                     tok_list = self.tokenizer.convert_ids_to_tokens(ans)
                     for elem in tok_list:
-                        ret += elem
-            ret = ret.replace("▁", " ")
-            ret = ret.replace("<s>", "")
-            ret = ret.replace("</s>", "")
+                        t_ret += elem
+                    t_ret = t_ret.replace("▁", " ")
+                    t_ret = t_ret.replace("<s>", "")
+                    t_ret = t_ret.replace("</s>", "")
+                    if t_ret in t_list:
+                        continue
+                    else:
+                        t_list.append(t_ret)
+            for _t_ret in t_list:
+                ret += _t_ret
             try:
                 elem_list = self.mecab.pos(ret)
+                print(elem_list)
                 if elem_list[-1][1] in ['JKS', 'JKC', 'JKG', 'JKO', 'JKB', 'JKV', 'JKQ', 'JC', 'JX']:
                     ret = ret.replace(elem_list[-1][0], '')
             except:
                 print("Pass Pos TAG")
-            ret_list.append(ret)
+            if skip_long and len(ret) > 150:
+                ret_list.append("")
+            else:
+                ret_list.append(ret)
         return ret_list
 
     def infer(self, context, question):
@@ -119,6 +131,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser()
     parser.add_argument("--max_len", type=int, default=384, help="max length of the context chunk")
+    parser.add_argument("--skip_long", action='store_true', help="skip long answers (threshold 150)")
     parser.add_argument("--batch", action='store_true', help="operate in batch")
     parser.add_argument("--batch_size", type=int, default=3)
     parser.add_argument("--ckpt_path", type=str, default="./kobart_qa", help="path to binary file")
@@ -132,7 +145,7 @@ if __name__ == "__main__":
         for i in range (args.batch_size):
             q = input('question> ').strip()
             batch.append([c, q])
-        a_list = QA_class.batch_infer(batch)
+        a_list = QA_class.batch_infer(batch, args.skip_long)
         for i, a in enumerate(a_list): 
             if a is None:
                 print(f"[{i}]: No Answer!") 

@@ -8,19 +8,22 @@ def add_end_idx(answers, contexts):
     for answer, context in zip(answers, contexts):
         gold_text = answer['text']
         start_idx = answer['answer_start']
-        end_idx = start_idx + len(gold_text)
+        if 'answer_end' in answer.keys():
+            continue
+        else:
+            end_idx = start_idx + len(gold_text)
 
-        # sometimes squad answers are off by a character or two - fix this 
-        if context[start_idx:end_idx] == gold_text:
-            answer['answer_end'] = end_idx 
-        elif context[start_idx-1:end_idx-1] == gold_text:
-            answer['answer_start'] = start_idx-1
-            answer['answer_end'] = end_idx-1
-        elif context[start_idx-2:end_idx-2] == gold_text:
-            answer['answer_start'] = start_idx-2
-            answer['answer_end'] = end_idx-2 
-        assert (answer['answer_start'] <= len(context))
-        assert (answer['answer_end'] <= len(context))
+            # sometimes squad answers are off by a character or two - fix this 
+            if context[start_idx:end_idx] == gold_text:
+                answer['answer_end'] = end_idx 
+            elif context[start_idx-1:end_idx-1] == gold_text:
+                answer['answer_start'] = start_idx-1
+                answer['answer_end'] = end_idx-1
+            elif context[start_idx-2:end_idx-2] == gold_text:
+                answer['answer_start'] = start_idx-2
+                answer['answer_end'] = end_idx-2 
+            assert (answer['answer_start'] <= len(context))
+            assert (answer['answer_end'] <= len(context))
     return
 
 def text_processing(data, args, tokenizer):
@@ -54,8 +57,11 @@ def text_processing(data, args, tokenizer):
         prev_ids = tokenizer.encode(prev_sen, add_special_tokens=False)
         context_ids = tokenizer.encode(context, add_special_tokens=False) 
         # get start_token 
+        # case 0 - when there is no answer:
+        if answer_text == None:
+            start_token = 0
         # case 1 - when the first elem of answer text is connected to last elem of prev_ids
-        if answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)-1]):
+        elif answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)-1]):
             start_token = len(prev_ids)-1 
         # case 2 - when they are not connected 
         elif answer_text[0] in tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)]):
@@ -69,8 +75,9 @@ def text_processing(data, args, tokenizer):
             print(f"context: {context}")
             print(tokenizer.convert_ids_to_tokens(context_ids))
             print(f"answer_text: {answer_text}")
+            print(f"answer_text[0]: {answer_text[0]}")
             print(f"len(prev_ids): {len(prev_ids)}")
-            print(f"context_ids[len(prev_ids)]: {context_ids[len(prev_ids)]}")
+            print(f"context_ids[len(prev_ids)]: {tokenizer.convert_ids_to_tokens(context_ids[len(prev_ids)])}")
             assert (False)
             """
 
@@ -80,6 +87,7 @@ def text_processing(data, args, tokenizer):
         end_token = 0
         error = False
         while not answer_text in possible_ans:
+            if (answer_text == None): break
             if (start_token+m == len(context_ids)): 
                 error = True
                 #print(f"Error occured in context: {context}, answer: {answer}")
@@ -92,7 +100,10 @@ def text_processing(data, args, tokenizer):
         assert (answer_text in possible_ans)
 
         q = tokenizer.encode(question, add_special_tokens=False)
-        a = tokenizer.encode(answer_text, add_special_tokens=False)
+        if not answer_text == None: 
+            a = tokenizer.encode(answer_text, add_special_tokens=False)
+        else:
+            a = None
         c = context_ids
 
         spair_len = max_len - 4 - len(q) # length left for context 
@@ -109,6 +120,7 @@ def text_processing(data, args, tokenizer):
             for _iter in range(iter_num):
                 chunk.append(c[_iter*spair_len:(_iter+1)*spair_len])
 
+
         stack_idx = 0
         for i, _chunk in enumerate(chunk):
             if debug: print(f"chunk #: {len(chunk)}, stack_idx: {stack_idx}")
@@ -121,6 +133,11 @@ def text_processing(data, args, tokenizer):
 
             _start_idx = start_token - stack_idx      # idx in current chunk
             _end_idx = end_token - stack_idx          # idx in current chunk
+    
+            # no answer 
+            if a is None:
+                _label_start = 0
+                _label_end = 0
 
             # already extracted answer from previous chunk
             if (_start_idx < 0 and _end_idx <= 0):
